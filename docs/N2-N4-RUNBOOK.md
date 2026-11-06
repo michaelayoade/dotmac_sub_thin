@@ -76,6 +76,17 @@ approval gate below.
    `dotmac-deploy validate` -> `render --check` -> `preflight` ->
    `plan` -> `deploy` (dry run). Review the plan against the bound
    digest and both expected heads.
+
+   **Facility-version fork (found 2026-11-06, decision required).**
+   The descriptor targets unreleased Foundation 0.4.0a1. The latest
+   released facility (0.2.0a2) refuses it; the full delta is:
+   ports `exposure`/`address_family` (0.2 uses `bind`), backup
+   `lineage` + `expected_backup_interval_seconds`, and the four
+   privilege verifications. A scratch downgrade validates + dry-runs
+   clean under 0.2.0a2 but deletes exactly those controls. Options:
+   (A) wait for the 0.4 release, (B) downgrade the descriptor with
+   recorded acceptances, (C) run unreleased 0.4 from source. No execute
+   until Michael/architect picks one. The repo descriptor stays 0.4.
 4. Only with Gate 0 approval: execute deploy. Verify loopback health
    (`/health`, `/health/ready` on 127.0.0.1:18011), migration heads via
    the migrate role, and runtime posture (startup check clean as
