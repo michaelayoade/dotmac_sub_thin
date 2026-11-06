@@ -98,6 +98,29 @@ compatibility = "online"
 lock_timeout_seconds = 300
 lock_retries = 4
 
+[backup]
+[[backup.datasets]]
+code = "primary"
+kind = "postgres"
+material = "BACKUP_DATABASE_URL"
+retention_days = 14
+checksum = "sha256"
+# Candidate data is rebuildable from legacy; volume-local backups need
+# no payload encryption yet. Revisit with the first non-rebuildable wave.
+encryption = "none"
+restore_proof_max_age_days = 30
+expected_backup_interval_seconds = 86400
+# Names the DATA, minted once (2026-11-06); never change it.
+lineage = "sub-thin-primary-a2991293"
+verify = [
+  "schema",
+  "migration_heads",
+  "roles",
+  "ownership",
+  "memberships",
+  "effective_privileges",
+]
+
 [telemetry]
 # Explicitly off for the empty candidate shell. Platform-health transport
 # and alert thresholds are first-wave decisions; rendering guessed alert
