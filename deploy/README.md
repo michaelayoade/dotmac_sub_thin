@@ -18,12 +18,12 @@ regenerate it, never hand-edit it.
 
 ## Blockers that stop this descriptor being deployable
 
-1. **Image and source unbound.** `[image]` carries the all-zero sentinel.
-   Binding tooling exists (`scripts/bind_image.py`, manual `image`
-   workflow producing a bound-copy artifact), but no build has run:
-   Forgejo authorization is absent in this session and on the test
-   server (HTTP 401), and shell source is not yet a repo. First build
-   binds the real digest + source revision together.
+1. **Image bound as a deployment artifact.** The repo descriptor
+   keeps the zero sentinel by convention; CI binds digest+revision
+   into an artifact copy (latest: `sha256:851a49f5…` at `de0f7e0`,
+   run 42245657543). The GHCR package is currently PUBLIC by owner
+   decision — that publishes the bundled Starter sources; revisit
+   before any non-candidate use (security review H1).
 2. **Migration bootstrap not product-owned.** `sub_thin.migrate` now
    composes the kernel + brand lineages and rehearsed to both heads on a
    disposable Postgres. Before first deploy, the operator must make the
