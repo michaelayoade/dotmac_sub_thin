@@ -61,6 +61,13 @@ def build_database_runtime(
     """
 
     env = os.environ if environ is None else environ
+    # Defense in depth: owner/source credentials never belong in a
+    # runtime process environment (descriptor material separation).
+    for forbidden in ("MIGRATION_DATABASE_URL", "LEGACY_DATABASE_URL"):
+        if forbidden in env:
+            raise DatabaseBindingError(
+                f"{forbidden} must not be present in a runtime process"
+            )
     if "DATABASE_URL" not in env:
         return None
     raw = env["DATABASE_URL"]
@@ -82,7 +89,7 @@ def build_database_runtime(
         else url
     )
 
-    connect_args = {"application_name": APPLICATION_NAME}
+    connect_args = {"application_name": APPLICATION_NAME, "connect_timeout": 5}
     engine = sa.create_engine(
         url, pool_pre_ping=True, hide_parameters=True, connect_args=connect_args
     )
@@ -121,15 +128,43 @@ def verify_runtime_role_posture(engine: sa.Engine) -> list[str]:
         with engine.connect() as connection:
             row = connection.execute(
                 sa.text(
-                    "SELECT rolbypassrls, rolsuper FROM pg_catalog.pg_roles "
-                    "WHERE rolname = current_user"
+                    "SELECT rolbypassrls, rolsuper, rolcreaterole, rolreplication "
+                    "FROM pg_catalog.pg_roles WHERE rolname = current_user"
                 )
             ).one_or_none()
+            if row is None:
+                return ["runtime database role not found in pg_roles"]
+            problems = runtime_role_violations(
+                bypasses_rls=bool(row[0]), superuser=bool(row[1])
+            )
+            if row[2]:
+                problems.append("runtime database role has CREATEROLE")
+            if row[3]:
+                problems.append("runtime database role has REPLICATION")
+            # A member of a BYPASSRLS/superuser role can SET ROLE into it;
+            # the pair check alone would call that posture safe.
+            inherited = connection.execute(
+                sa.text(
+                    "WITH RECURSIVE membership(roleid) AS ("
+                    " SELECT roleid FROM pg_catalog.pg_auth_members"
+                    " WHERE member = (SELECT oid FROM pg_catalog.pg_roles"
+                    "                 WHERE rolname = current_user)"
+                    " UNION"
+                    " SELECT am.roleid FROM pg_catalog.pg_auth_members am"
+                    " JOIN membership m ON am.member = m.roleid)"
+                    " SELECT count(*) FROM pg_catalog.pg_roles r"
+                    " JOIN membership m ON r.oid = m.roleid"
+                    " WHERE r.rolbypassrls OR r.rolsuper"
+                )
+            ).scalar()
+            if inherited:
+                problems.append(
+                    "runtime database role inherits BYPASSRLS/superuser "
+                    "through role membership"
+                )
+            return problems
     except sa.exc.SQLAlchemyError as exc:
         return [f"runtime database posture could not be verified: {type(exc).__name__}"]
-    if row is None:
-        return ["runtime database role not found in pg_roles"]
-    return runtime_role_violations(bypasses_rls=bool(row[0]), superuser=bool(row[1]))
 
 
 def database_startup_checks(
@@ -141,9 +176,31 @@ def database_startup_checks(
         return ()
 
     def _posture() -> Sequence[str]:
-        return verify_runtime_role_posture(runtime.engine)
+        problems = verify_runtime_role_posture(runtime.engine)
+        problems += [
+            f"platform: {problem}"
+            for problem in verify_runtime_role_posture(runtime.platform_engine)
+        ]
+        return problems
 
     return (_posture,)
+
+
+def enforce_runtime_posture(runtime: DatabaseRuntime | None) -> None:
+    """Fail closed regardless of ENVIRONMENT.
+
+    Kernel startup checks only raise in production and otherwise log a
+    warning (witnessed: a superuser candidate boot served traffic). The
+    process entrypoint calls this before serving so a bypass-capable
+    runtime DSN can never serve in any environment.
+    """
+
+    if runtime is None:
+        return
+    problems = verify_runtime_role_posture(runtime.engine)
+    problems += verify_runtime_role_posture(runtime.platform_engine)
+    if problems:
+        raise DatabaseBindingError("; ".join(problems))
 
 
 __all__ = [
@@ -151,6 +208,7 @@ __all__ = [
     "DatabaseBindingError",
     "build_database_runtime",
     "database_startup_checks",
+    "enforce_runtime_posture",
     "runtime_role_violations",
     "verify_runtime_role_posture",
 ]

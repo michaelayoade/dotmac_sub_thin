@@ -7,6 +7,7 @@ import pytest
 from alembic.script import ScriptDirectory
 
 from sub_thin.migrate import (
+    EXPECTED_HEADS,
     MigrationConfigurationError,
     build_config,
     migration_paths,
@@ -34,4 +35,4 @@ def test_build_config_composes_kernel_and_brand_lineages() -> None:
     assert len(versions) == 3
     assert all(path.is_dir() for path in versions)
     heads = ScriptDirectory.from_config(config).get_heads()
-    assert sorted(heads) == ["0030_credential_tenant_key", "bp_0001_brand_profiles"]
+    assert sorted(heads) == sorted(EXPECTED_HEADS)

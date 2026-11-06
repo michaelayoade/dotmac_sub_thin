@@ -13,8 +13,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
@@ -55,7 +57,34 @@ def main() -> int:
         "--execute", action="store_true",
         help="actually write (default: dry-run, no database touched)",
     )
+    parser.add_argument("--expected-extract-sha256")
+    parser.add_argument("--expected-resolved-sha256")
+    parser.add_argument(
+        "--accept-unresolved", action="append", default=[],
+        metavar="FIELD:DISPOSITION",
+        help="accept one completion unresolved entry on --execute (repeatable)",
+    )
+    parser.add_argument(
+        "--activate", action="store_true",
+        help="activate loaded profiles (default: load as draft)",
+    )
     args = parser.parse_args()
+
+    def _digest(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    digests = {"extract_sha256": _digest(args.extract)}
+    if args.complete_from_resolved:
+        digests["resolved_sha256"] = _digest(args.complete_from_resolved)
+    if args.execute:
+        if args.expected_extract_sha256 != digests["extract_sha256"]:
+            print("load refused: extract digest mismatch or not supplied", file=sys.stderr)
+            return 2
+        if args.complete_from_resolved and (
+            args.expected_resolved_sha256 != digests.get("resolved_sha256")
+        ):
+            print("load refused: resolved digest mismatch or not supplied", file=sys.stderr)
+            return 2
 
     try:
         report, plan = build_report(
@@ -68,7 +97,7 @@ def main() -> int:
         return 2
 
     totals = report.to_dict()["totals"]
-    print(json.dumps({"mode": "execute" if args.execute else "dry-run", **totals}, sort_keys=True))
+    print(json.dumps({"mode": "execute" if args.execute else "dry-run", **digests, **totals}, sort_keys=True))
     if plan is not None:
         print(json.dumps({
             "completion_unresolved": [
@@ -80,6 +109,22 @@ def main() -> int:
     if not args.execute:
         print("dry-run: no database touched")
         return 0
+
+    if plan is not None and plan.unresolved:
+        accepted = set(args.accept_unresolved)
+        missing = [
+            f"{r.field}:{r.disposition}"
+            for r in plan.unresolved
+            if f"{r.field}:{r.disposition}" not in accepted
+        ]
+        if missing:
+            print(f"load refused: unaccepted unresolved {missing}", file=sys.stderr)
+            return 2
+    if not args.activate:
+        report = replace(
+            report,
+            loadable=tuple(replace(item, activate=False) for item in report.loadable),
+        )
 
     from sub_thin.database import (
         build_database_runtime,
@@ -94,6 +139,22 @@ def main() -> int:
     if problems:
         for problem in problems:
             print(f"load refused: {problem}", file=sys.stderr)
+        return 2
+
+    import sqlalchemy as sa
+
+    from sub_thin.migrate import EXPECTED_HEADS
+
+    try:
+        with runtime.engine.connect() as connection:
+            heads = tuple(sorted(connection.execute(
+                sa.text("SELECT version_num FROM alembic_version")
+            ).scalars().all()))
+    except sa.exc.SQLAlchemyError as exc:
+        print(f"load refused: migration heads unverifiable ({type(exc).__name__})", file=sys.stderr)
+        return 2
+    if heads != tuple(sorted(EXPECTED_HEADS)):
+        print(f"load refused: migration heads {heads} != expected {sorted(EXPECTED_HEADS)}", file=sys.stderr)
         return 2
 
     tenant = UUID(args.tenant_id)

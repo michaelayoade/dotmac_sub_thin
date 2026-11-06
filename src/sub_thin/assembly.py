@@ -61,4 +61,6 @@ assembly: Final = ProductAssemblySpec(
     api_documentation=environment_api_documentation_policy(),
 )
 
-__all__ = ["PRODUCT_NAME", "assembly"]
+database_runtime = _database_runtime
+
+__all__ = ["PRODUCT_NAME", "assembly", "database_runtime"]

@@ -13,6 +13,7 @@ not) and are counted separately.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -64,10 +65,13 @@ class Reject:
     value: str = ""
 
     def to_dict(self) -> dict[str, str]:
+        # Never serialize the rejected value itself: later waves carry
+        # real tenant data through this ledger. Length + hash only.
+        digest = hashlib.sha256(self.value.encode()).hexdigest() if self.value else ""
         return {
             "source_id": self.source_id, "field": self.field,
             "disposition": self.disposition, "detail": self.detail,
-            "value": self.value[:200],
+            "value_sha256": digest, "value_length": str(len(self.value)),
         }
 
 
@@ -426,6 +430,22 @@ def complete_platform_brand(
                 "no_tenant_plane_home",
                 "no tenant-plane field in dotmac-brand-profiles",
                 legacy_resolved[legacy_field],
+            )
+
+    known_resolved = {
+        "name", "product_name", "legal_name", "legal_address",
+        "support_email", "support_phone", "from_email", "from_name",
+        "app_url", "primary_color", "secondary_color", "semantic_colors",
+        "source_scope", "source_scope_id",
+        *_FILE_REFS, *_NO_HOME,
+    }
+    for key in legacy_resolved:
+        if key not in known_resolved:
+            add_reject(
+                key,
+                "unknown_resolved_field",
+                "key not in the legacy resolved-brand contract",
+                legacy_resolved[key],
             )
 
     validate_brand_values(fields)

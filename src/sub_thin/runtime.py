@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import argparse
 import os
+import sys
 from collections.abc import Sequence
 
 import uvicorn
 
+from sub_thin.assembly import database_runtime
+from sub_thin.database import DatabaseBindingError, enforce_runtime_posture
 from sub_thin.main import app
 
 
@@ -25,6 +28,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Container port to bind (default: APP_PORT or 8000)",
     )
     args = parser.parse_args(argv)
+    # Fail closed in every environment: kernel startup checks only warn
+    # outside production, which once let a superuser DSN serve traffic.
+    try:
+        enforce_runtime_posture(database_runtime)
+    except DatabaseBindingError as exc:
+        print(f"refusing to serve: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
     uvicorn.run(app, host="0.0.0.0", port=args.port)
 
 

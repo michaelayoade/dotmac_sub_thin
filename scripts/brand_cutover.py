@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from uuid import UUID
@@ -43,6 +44,10 @@ def main() -> int:
     parser.add_argument("--tenant-id", required=True)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--complete-from-resolved", type=Path)
+    parser.add_argument(
+        "--print-payload", action="store_true",
+        help="print the full report JSON to stdout (default: totals only)",
+    )
     args = parser.parse_args()
 
     rows = json.loads(args.extract.read_text(encoding="utf-8"))
@@ -62,8 +67,13 @@ def main() -> int:
         report = plan.completed_report()
     payload = json.dumps(output, indent=2, sort_keys=True)
     if args.out:
-        args.out.write_text(payload + "\n", encoding="utf-8")
-    print(payload if not args.out else json.dumps(report.to_dict()["totals"], sort_keys=True))
+        fd = os.open(args.out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload + "\n")
+    if args.print_payload:
+        print(payload)
+    else:
+        print(json.dumps(report.to_dict()["totals"], sort_keys=True))
     return 0 if report.reconciled else 1
 
 

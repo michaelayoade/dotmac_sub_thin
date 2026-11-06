@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -39,7 +41,7 @@ def main() -> int:
         [
             "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15",
             args.ssh_host,
-            f"docker exec -i {args.container} {args.python} -",
+            f"docker exec -i {shlex.quote(args.container)} {shlex.quote(args.python)} -",
         ],
         input=REMOTE_CODE,
         capture_output=True,
@@ -59,10 +61,9 @@ def main() -> int:
         print("resolved-brand snapshot must be a JSON object", file=sys.stderr)
         return 1
 
-    args.out.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    args.out.chmod(0o600)
+    fd = os.open(args.out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     print("fields=", sorted(payload))
     print("sha256=", hashlib.sha256(args.out.read_bytes()).hexdigest())
     return 0

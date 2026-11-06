@@ -41,6 +41,14 @@ class MigrationConfigurationError(RuntimeError):
     """A sanitized migration configuration refusal."""
 
 
+# Mirrors deploy/product.toml [migration] expected_heads. The durable
+# migrate-entrypoint test asserts ScriptDirectory heads equal this set.
+EXPECTED_HEADS: tuple[str, ...] = (
+    "0030_credential_tenant_key",
+    "bp_0001_brand_profiles",
+)
+
+
 def _module_dir(package: str) -> Path:
     module_file = import_module(package).__file__
     if module_file is None:  # pragma: no cover - installed packages are files
@@ -103,8 +111,32 @@ def build_config(database_url: str | None = None) -> Config:
     return config
 
 
+def _preflight_owner(selected: str) -> None:
+    """Refuse a superuser migration identity; name the target database."""
+
+    engine = sa.create_engine(selected, pool_pre_ping=True, hide_parameters=True)
+    try:
+        with engine.connect() as connection:
+            row = connection.execute(
+                sa.text(
+                    "SELECT current_database(), current_user, "
+                    "(SELECT rolsuper FROM pg_catalog.pg_roles "
+                    " WHERE rolname = current_user)"
+                )
+            ).one()
+    finally:
+        engine.dispose()
+    print(f"migration target: database={row[0]} user={row[1]}")
+    if row[2]:
+        raise MigrationConfigurationError(
+            "migration identity is a superuser; use the non-super owner role"
+        )
+
+
 def upgrade_heads(database_url: str | None = None) -> None:
-    command.upgrade(build_config(database_url), "heads")
+    config = build_config(database_url)
+    _preflight_owner(select_url(database_url))
+    command.upgrade(config, "heads")
 
 
 def current_heads(database_url: str | None = None) -> tuple[str, ...]:

@@ -20,6 +20,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+COPY scripts ./scripts
 
 RUN --mount=type=secret,id=forgejo_username \
     --mount=type=secret,id=forgejo_password \
@@ -39,6 +40,9 @@ RUN groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 --no-create-home
 
 COPY --from=builder --chown=10001:10001 /app/.venv ./.venv
 COPY --from=builder --chown=10001:10001 /app/src ./src
+# Operator CLIs ship in the image so ops runs are digest-bound, never
+# whatever happens to sit in a host mount.
+COPY --from=builder --chown=10001:10001 /app/scripts ./scripts
 
 USER 10001:10001
 EXPOSE 8000

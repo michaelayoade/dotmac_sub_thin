@@ -60,7 +60,9 @@ def main() -> int:
 
     engine = sa.create_engine(url, hide_parameters=True)
     rows = extract(engine)
-    args.out.write_text(json.dumps(rows, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    fd = os.open(args.out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(rows, indent=2, sort_keys=True) + "\n")
     print(f"extracted {len(rows)} brand_profiles rows -> {args.out}")
     return 0
 
