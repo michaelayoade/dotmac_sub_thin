@@ -33,8 +33,11 @@ regenerate it, never hand-edit it.
 3. **No backup dataset.** The empty shell holds no durable state, so none
    is declared — true only until the first data wave, which must declare a
    dataset with encryption + restore proof before it may hold state.
-4. **Alert thresholds undecided.** Rendered Compose/alert assets are not
-   committed until Sub supplies its own `thresholds` values.
+4. **Alert thresholds provisional.** `deploy/alerts/thresholds.json`
+   carries the Starter reference values so the renderer can run while
+   telemetry stays off. They are NOT Sub product decisions; review them
+   before telemetry is ever enabled. Rendered assets are generated from
+   the bound descriptor, never committed from the sentinel.
 5. **Host and path gates open.** Live host re-verification, WHMCS-stack
    disposition, OpenBao/fleet-registry gaps, architect security review, and
    the D1/Gate 0 Control deploy path (debt register N2/D1/D7).
