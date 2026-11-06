@@ -18,14 +18,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
 RUN --mount=type=secret,id=forgejo_username \
     --mount=type=secret,id=forgejo_password \
     UV_INDEX_FORGEJO_USERNAME="$(cat /run/secrets/forgejo_username)" \
     UV_INDEX_FORGEJO_PASSWORD="$(cat /run/secrets/forgejo_password)" \
-    uv sync --no-dev --no-editable
+    uv sync --frozen --no-dev --no-editable
 
 FROM python:3.12-slim-bookworm
 

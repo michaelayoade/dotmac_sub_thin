@@ -16,8 +16,8 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/michaelayoade/dotmac_sub_thin
-  UV_INDEX_FORGEJO_USERNAME: ${{ secrets.UV_INDEX_FORGEJO_USERNAME }}
-  UV_INDEX_FORGEJO_PASSWORD: ${{ secrets.UV_INDEX_FORGEJO_PASSWORD }}
+  UV_INDEX_FORGEJO_USERNAME: ci-reader
+  UV_INDEX_FORGEJO_PASSWORD: ${{ secrets.FORGEJO_READ_TOKEN }}
 
 jobs:
   test-and-build:
@@ -48,8 +48,8 @@ jobs:
           push: true
           tags: ${{ env.IMAGE }}:${{ github.sha }}
           secrets: |
-            forgejo_username=${{ secrets.UV_INDEX_FORGEJO_USERNAME }}
-            forgejo_password=${{ secrets.UV_INDEX_FORGEJO_PASSWORD }}
+            forgejo_username=ci-reader
+            forgejo_password=${{ secrets.FORGEJO_READ_TOKEN }}
 
       - name: Produce bound descriptor copy
         run: |
