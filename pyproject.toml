@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dotmac-sub-thin"
+version = "0.1.0a0"
+description = "Composed Sub shell (N2): Starter kernel factory + released modules, no product traffic yet"
+requires-python = ">=3.11,<3.14"
+# Released pins only, mirroring legacy dotmac_sub at e449653a5. The shell
+# mounts NO product modules yet (N2 = empty shell, health + rollback proof);
+# modules are added one wave at a time under N3/N4.
+dependencies = [
+    "alembic==1.13.2",
+    "dotmac-kernel==0.1.0a107",
+    # N3 first module (harness imports its translator/service; the module
+    # mounts in the assembly only with its data wave).
+    "dotmac-brand-profiles==0.1.0a1",
+    "dotmac-ui==0.1.0a9",
+    # Driver is an assembly concern (kernel excludes it deliberately);
+    # same pin as legacy Sub.
+    "psycopg[binary]==3.1.19",
+    "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+test = ["httpx>=0.27", "pytest>=8"]
+
+# Private Dotmac package index (Forgejo). URL only — credentials live in the
+# operator environment, never in this file.
+[[tool.uv.index]]
+name = "forgejo"
+url = "https://registry.dotmac.io/api/packages/dotmac/pypi/simple/"
+explicit = true
+
+[tool.uv.sources]
+dotmac-kernel = { index = "forgejo" }
+dotmac-brand-profiles = { index = "forgejo" }
+dotmac-ui = { index = "forgejo" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sub_thin"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

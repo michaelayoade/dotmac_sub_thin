@@ -1,0 +1,113 @@
+# Composed Sub shell — ProductDeploymentSpec.v1 (DRAFT, NOT DEPLOYABLE YET).
+#
+# This is the N2 candidate descriptor for the designated host
+# 81.0.221.52 (vmi3698737). It is not consumed by any deployment path today.
+# deploy/README.md records the blockers that must close before Control may
+# bind an authorization to it (unbound image/source, migration entrypoint,
+# backup dataset, D1/Gate 0). Regenerate rendered assets from this file;
+# never hand-edit a rendered result.
+
+schema = "ProductDeploymentSpec.v1"
+product = "dotmac-sub"
+environment = "candidate"
+
+[assembly]
+manifest_path = "deploy/product-manifest.json"
+# Real digest of deploy/product-manifest.json, generated from the runtime
+# assembly by scripts/product_manifest.py (kernel canonical bytes).
+manifest_digest = "sha256:d4c28478a765783faf1cf11dfad44fcd94046b5c7b696f14ebff10a5aa87693a"
+
+[image]
+# UNBOUND SENTINEL, deliberately. No CI build of this shell exists yet, and
+# inventing a digest would be false provenance. The first test-server/CI
+# build binds the real repo@sha256 digest together with source_revision.
+reference = "ghcr.io/michaelayoade/dotmac_sub_thin@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+source_revision = "0000000000000000000000000000000000000000"
+
+[runtime_materials]
+# Names only; values are supplied by the deployment environment. ENVIRONMENT
+# drives the kernel API-documentation policy (production fails closed).
+# DATABASE_URL is the runtime role DSN (non-superuser, NOBYPASSRLS — the
+# assembly's startup check proves it); never the migration owner material.
+names = ["DATABASE_URL", "ENVIRONMENT"]
+
+[[roles]]
+code = "app"
+# Product-owned launcher; bind address lives in sub_thin.runtime (bound by
+# the image digest), not in this descriptor.
+command = ["python", "-m", "sub_thin.runtime", "--port", "8000"]
+replicas = 1
+stop_grace_seconds = 30
+materials = ["DATABASE_URL", "ENVIRONMENT"]
+
+[roles.resources]
+# Placeholder sizing for an empty shell on a 6-vCPU/11-GB host; confirm
+# against the first data wave before calling these ceilings final.
+cpus = "1.0"
+memory = "512m"
+pids = 128
+
+[roles.security]
+user = "10001:10001"
+read_only_root = true
+no_new_privileges = true
+cap_drop = ["ALL"]
+tmpfs = ["/tmp"]
+
+# Two probes, two paths. Live is the kernel's DB-free /health (the kernel
+# does not bypass tenant resolution for /health/live, so that spelling
+# would 500 without a database). Ready is the assembly-owned
+# /health/ready, tenant-bypassed by the kernel and dependency-free only
+# while no data-bearing module is mounted.
+[roles.health.live]
+path = "/health"
+port = 8000
+interval_seconds = 10
+timeout_seconds = 3
+retries = 3
+start_period_seconds = 10
+
+[roles.health.ready]
+path = "/health/ready"
+port = 8000
+interval_seconds = 5
+timeout_seconds = 3
+retries = 6
+start_period_seconds = 10
+
+# Loopback only: an operator/Control probe surface on the candidate host.
+# No ingress and no product traffic in N2.
+[[roles.ports]]
+container = 8000
+host = 18011
+protocol = "tcp"
+exposure = "loopback"
+address_family = "ipv4"
+
+[migration]
+# Implemented in sub_thin.migrate and rehearsed to these two heads on a
+# disposable composed Postgres. The operator bootstrap must make the
+# migration owner own the public schema and pre-create the kernel role
+# family (including both outbox dispatchers) or grant it CREATEROLE;
+# app_admin alone cannot create the dispatcher roles named by 0011/0012.
+command = ["python", "-m", "sub_thin.migrate", "upgrade", "heads"]
+heads_command = ["python", "-m", "sub_thin.migrate", "current"]
+owner_material = "MIGRATION_DATABASE_URL"
+expected_heads = ["0030_credential_tenant_key", "bp_0001_brand_profiles"]
+compatibility = "online"
+lock_timeout_seconds = 300
+lock_retries = 4
+
+[telemetry]
+# Explicitly off for the empty candidate shell. Platform-health transport
+# and alert thresholds are first-wave decisions; rendering guessed alert
+# numbers would claim coverage this deployment does not have.
+logs = false
+metrics = false
+traces = false
+app_direct_shipping = false
+deployment_annotations = false
+
+[rollout]
+stability_window_seconds = 60
+rollback_images_retained = 2
