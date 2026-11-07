@@ -29,7 +29,10 @@ source_revision = "0000000000000000000000000000000000000000"
 # drives the kernel API-documentation policy (production fails closed).
 # DATABASE_URL is the runtime role DSN (non-superuser, NOBYPASSRLS — the
 # assembly's startup check proves it); never the migration owner material.
-names = ["DATABASE_URL", "ENVIRONMENT"]
+# The secret materials + TRUSTED_HOSTS + SEED_ON_STARTUP are enforced by
+# sub_thin.materials in every environment once a database is bound (M2):
+# the kernel alone would serve non-production with published sentinels.
+names = ["DATABASE_URL", "ENVIRONMENT", "JWT_SECRET", "SESSION_HASH_SECRET", "CSRF_SECRET", "TRUSTED_HOSTS", "SEED_ON_STARTUP"]
 
 [[roles]]
 code = "app"
@@ -38,7 +41,7 @@ code = "app"
 command = ["python", "-m", "sub_thin.runtime", "--port", "8000"]
 replicas = 1
 stop_grace_seconds = 30
-materials = ["DATABASE_URL", "ENVIRONMENT"]
+materials = ["DATABASE_URL", "ENVIRONMENT", "JWT_SECRET", "SESSION_HASH_SECRET", "CSRF_SECRET", "TRUSTED_HOSTS", "SEED_ON_STARTUP"]
 
 [roles.resources]
 # Placeholder sizing for an empty shell on a 6-vCPU/11-GB host; confirm
