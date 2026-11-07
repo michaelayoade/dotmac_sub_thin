@@ -4,6 +4,9 @@ Status: planning/rehearsal only. This runbook authorizes nothing.
 Production writes, host mutation, and deployment each keep their own
 approval gate below.
 
+Current gate and evidence checklist: [DEPLOYMENT-READINESS.md](DEPLOYMENT-READINESS.md).
+That checklist supersedes historical host/image assumptions below.
+
 ## Current evidence
 
 - N1 done; N3 brand table totals done (register v1059 baseline).
@@ -13,12 +16,16 @@ approval gate below.
 - Real production brand extract: 1 row -> 1 loadable, reconciled.
 - Target-side completion rehearsed to full mapped-field parity in a
   disposable composed DB (caller rollback + idempotent rerun passed).
-- Designated host `81.0.221.52` is currently **unreachable** from this
-  workstation and from four fleet jump hosts; its node exporter also
-  refuses from `dotmac-observe` (checked 2026-11-06). Treat power or
-  network recovery as Gate 2.0.
+- Host `81.0.221.52` subsequently recovered; the executing session
+  reports the manual DB-bound candidate healthy and M2/restore rehearsal
+  passed. This is not a governed deployment. Recheck host identity and
+  health in the deployment window.
 
 ## Gate 0 — decisions before any mutation
+
+Michael is the sole developer and approver and holds the captain, architect
+and CP owner roles. Role labels below identify the evidence required;
+they do not require additional people. Agent reviews are advisory evidence.
 
 1. Architect security review of: thin assembly, database role family,
    descriptor exposure (loopback only), migration owner separation,
@@ -31,17 +38,19 @@ approval gate below.
 
 ## Gate 1 — bind the image (no deploy)
 
-1. Put this source under version control on a protected main. The shell
-   source is not yet a repository; do not invent a source revision.
-2. Configure `UV_INDEX_FORGEJO_USERNAME` / `UV_INDEX_FORGEJO_PASSWORD`
-   as CI secrets. Run the manual `image` workflow
+1. Use the existing private `dotmac_sub_thin` repository and exact
+   protected-source revision; do not invent a source revision.
+2. Use the configured `FORGEJO_READ_TOKEN` secret with CI reader identity
+   as wired in the image workflow. Run the manual `image` workflow
    (`.github/workflows/image.yml`): tests -> buildx push to GHCR ->
    `binding/` artifact containing a bound descriptor copy.
 3. Review the artifact diff: only `[image] reference`,
    `source_revision`, and the provenance comment may change. The binder
    (`scripts/bind_image.py`) refuses sentinel digest/revision and any
    repository change.
-4. Supply real Sub alert thresholds, then render and audit:
+4. Keep provisional thresholds and telemetry off for offline rendering.
+   Michael must approve Sub product thresholds before telemetry is enabled.
+   Render and audit:
    `dotmac-deploy validate`, `dotmac-deploy render --check`,
    `dotmac-deploy image-audit` against the pushed digest.
 5. Record workflow run, digest, revision, and audit output in the
@@ -77,32 +86,31 @@ approval gate below.
    `plan` -> `deploy` (dry run). Review the plan against the bound
    digest and both expected heads.
 
-   **Facility-version fork (found 2026-11-06, decision required).**
-   The descriptor targets unreleased Foundation 0.4.0a1. The latest
-   released facility (0.2.0a2) refuses it; the full delta is:
-   ports `exposure`/`address_family` (0.2 uses `bind`), backup
-   `lineage` + `expected_backup_interval_seconds`, and the four
-   privilege verifications. A scratch downgrade validates + dry-runs
-   clean under 0.2.0a2 but deletes exactly those controls. Options:
-   (A) wait for the 0.4 release, (B) downgrade the descriptor with
-   recorded acceptances, (C) run unreleased 0.4 from source. No execute
-   until Michael/architect picks one. The repo descriptor stays 0.4.
+   **Released Foundation required.** 0.4.0a1 is spent; do not publish or
+   allocate a successor until the captain/architect ruling and pre-freeze
+   certifications land. Adopt released 0.4.0a2 only after the release lane
+   promotes its committed artifact and install-back proof passes. Rebind
+   and validate the packet; do not silently downgrade controls.
+
+   Run `python -m sub_thin.preflight` with the final production runtime
+   environment in the bound image. Record its offline result separately
+   from live readiness. CP execution readiness and the accepted first-deploy
+   recovery procedure are mandatory independent gates (see checklist).
 4. Only with Gate 0 approval: execute deploy. Verify loopback health
    (`/health`, `/health/ready` on 127.0.0.1:18011), migration heads via
    the migrate role, and runtime posture (startup check clean as
    app_user). No ingress is declared; public reachability is a defect.
-5. Rollback: Foundation retains 2 rollback images; with no traffic and
-   no durable brand state loaded yet, rollback = previous image or
-   stop the candidate. Record the rehearsal result before N2 closes.
+5. First-deploy recovery: no governed predecessor image is recorded.
+   Do not claim Foundation rollback support from image retention alone.
+   Accept and rehearse the procedure in DEPLOYMENT-READINESS.md, including
+   database compatibility and a fresh pre-execute backup, before the first governed execute.
 
 ## Gate 4 — N4 brand flip rehearsal, then flip
 
-Authority choice comes first (writer-boundary record): either
-**(A)** complete the platform profile in legacy through the existing
-reviewed sync surface, or **(B)** approve the target-side completion
-planner rehearsed here (`complete_platform_brand`) as the completion
-authority. Do not run both. Option A is a legacy write; option B writes
-only the composed target. Neither has run against production state.
+Authority already endorsed: target-side `complete_platform_brand` planner.
+Do not reopen the legacy-sync alternative or run both. Endorsement does
+not authorize a brand flip: the named window, dispositions and consumer
+integration gates remain. See [N4 design](N4-brand-consumer-design.md).
 
 1. Freeze legacy brand/settings writers for the window.
 2. Fresh read-only evidence, same snapshot discipline as N3:

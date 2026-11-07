@@ -18,9 +18,9 @@ manifest_path = "deploy/product-manifest.json"
 manifest_digest = "sha256:d4c28478a765783faf1cf11dfad44fcd94046b5c7b696f14ebff10a5aa87693a"
 
 [image]
-# UNBOUND SENTINEL, deliberately. No CI build of this shell exists yet, and
-# inventing a digest would be false provenance. The first test-server/CI
-# build binds the real repo@sha256 digest together with source_revision.
+# UNBOUND SENTINEL, deliberately. CI supplies a bound artifact copy;
+# inventing a digest here would be false provenance. Each CI artifact
+# binds the real repo@sha256 digest together with source_revision.
 reference = "ghcr.io/michaelayoade/dotmac_sub_thin@sha256:0000000000000000000000000000000000000000000000000000000000000000"
 source_revision = "0000000000000000000000000000000000000000"
 
@@ -32,7 +32,7 @@ source_revision = "0000000000000000000000000000000000000000"
 # The secret materials + TRUSTED_HOSTS + SEED_ON_STARTUP are enforced by
 # sub_thin.materials in every environment once a database is bound (M2):
 # the kernel alone would serve non-production with published sentinels.
-names = ["DATABASE_URL", "ENVIRONMENT", "JWT_SECRET", "SESSION_HASH_SECRET", "CSRF_SECRET", "TRUSTED_HOSTS", "SEED_ON_STARTUP"]
+names = ["DATABASE_URL", "PLATFORM_DATABASE_URL", "PLATFORM_ROOT_DOMAIN", "ENVIRONMENT", "JWT_SECRET", "SESSION_HASH_SECRET", "CSRF_SECRET", "TRUSTED_HOSTS", "SEED_ON_STARTUP"]
 
 [[roles]]
 code = "app"
@@ -41,7 +41,7 @@ code = "app"
 command = ["python", "-m", "sub_thin.runtime", "--port", "8000"]
 replicas = 1
 stop_grace_seconds = 30
-materials = ["DATABASE_URL", "ENVIRONMENT", "JWT_SECRET", "SESSION_HASH_SECRET", "CSRF_SECRET", "TRUSTED_HOSTS", "SEED_ON_STARTUP"]
+materials = ["DATABASE_URL", "PLATFORM_DATABASE_URL", "PLATFORM_ROOT_DOMAIN", "ENVIRONMENT", "JWT_SECRET", "SESSION_HASH_SECRET", "CSRF_SECRET", "TRUSTED_HOSTS", "SEED_ON_STARTUP"]
 
 [roles.resources]
 # Placeholder sizing for an empty shell on a 6-vCPU/11-GB host; confirm
