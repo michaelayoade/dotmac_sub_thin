@@ -1,6 +1,7 @@
-# First governed deploy — recovery procedure (PROPOSAL)
+# First governed deploy — recovery procedure (ACCEPTED for deploy #1)
 
-Status: DRAFT for Michael acceptance (2026-11-07). Grants no authority.
+Status: ACCEPTED by Michael 2026-11-07 ("proceed"), recorded in the
+debt register. Scope: deploy #1 only. Grants no authority by itself.
 Required by `docs/DEPLOYMENT-READINESS.md` gate "First-deploy recovery":
 no governed predecessor image is recorded, and Foundation rollback is
 refused until an execute records one. Image retention alone is not

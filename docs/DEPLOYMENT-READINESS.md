@@ -27,7 +27,7 @@ constitute a governed execute or a fresh pre-deployment backup.
 | Foundation certifications | Rule 49 per-gap answer, Q1, CP Q2 | Pending |
 | CP execution readiness | Installed admission provider, approval subject, adopted D/E replacements, executor behavior proofs | Pending; execute held |
 | Production configuration | Offline preflight in exact image with final runtime materials, then live posture/heads/readiness | Offline command implemented; final packet proof pending |
-| First-deploy recovery | Supported predecessor baseline OR explicitly accepted first-deploy recovery procedure, database compatibility, rehearsal | Pending; no previous governed image recorded |
+| First-deploy recovery | Supported predecessor baseline OR explicitly accepted first-deploy recovery procedure, database compatibility, rehearsal | ACCEPTED for deploy #1 (Michael, 2026-11-07): `docs/FIRST-DEPLOY-RECOVERY.md`, swing-rehearsed; re-derive per future migration wave |
 | Telemetry | Product threshold approval bound to threshold-file SHA-256 | Pending; all telemetry switches remain off |
 | Brand flip | N4 dispositions, consumer integration/parity, named window | Pending; target-side completion authority already endorsed |
 
