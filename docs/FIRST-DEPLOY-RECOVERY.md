@@ -62,14 +62,17 @@ resumed", because there is no previous release.
 
 ## Rehearsal status
 
-Steps 1–2 and the restore half of step 5 are already proven on the
-candidate database (2026-11-07: capture `09b260f4…`, restore 0 errors,
-isolation 0/1, scratch dropped; recovery took ~1s at current data
-volume — a floor, not a prediction). Owed before the window: one
-end-to-end rehearsal of steps 5–6 against a scratch database swing
-(stop → restore → restart prior image → readiness), timed and
-recorded. Production data volume is one brand row; timing risk is
-negligible until the first data wave after brand.
+PROVEN end-to-end 2026-11-07 (swing rehearsal, real candidate never
+stopped): fresh capture (sha256 `0478f828…`, 9374 bytes) → scratch
+restore (1s, 0 errors, heads `0030_credential_tenant_key` +
+`bp_0001_brand_profiles`, brand rows 1) → production preflight in the
+exact image against the swing environment (pass) → prior-image
+container on the restored database ready in database mode (boot 3s;
+total swing 7s) → teardown complete, candidate untouched. Script:
+`/root/subthin/ops/swing.sh` on the host. Earlier partial proof also
+stands (capture `09b260f4…`, isolation 0-without/1-with context).
+Timing is at one-brand-row volume — a floor, not a prediction;
+re-measure at each data wave.
 
 ## Acceptance
 
