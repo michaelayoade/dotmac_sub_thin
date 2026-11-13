@@ -62,9 +62,12 @@ def build_database_runtime(
 
     env = os.environ if environ is None else environ
     # Defense in depth: owner/source credentials never belong in a
-    # runtime process environment (descriptor material separation).
+    # runtime process environment (descriptor material separation). Any
+    # letter case is refused: the kernel's settings match names with
+    # str.lower(), so a variant spelling must not slip by.
+    present = {key.lower() for key in env}
     for forbidden in ("MIGRATION_DATABASE_URL", "LEGACY_DATABASE_URL"):
-        if forbidden in env:
+        if forbidden.lower() in present:
             raise DatabaseBindingError(
                 f"{forbidden} must not be present in a runtime process"
             )

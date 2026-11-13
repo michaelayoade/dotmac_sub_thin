@@ -54,6 +54,18 @@ def test_owner_material_refused_in_runtime_env() -> None:
         })
 
 
+@pytest.mark.parametrize("name", ["MIGRATION_DATABASE_URL", "LEGACY_DATABASE_URL"])
+@pytest.mark.parametrize("spelling", [str.lower, str.title])
+def test_owner_material_refused_in_any_case(name, spelling) -> None:
+    secret = "postgresql+psycopg://app_admin:private@127.0.0.1:1/none"
+    with pytest.raises(DatabaseBindingError) as exc:
+        build_database_runtime({
+            "DATABASE_URL": "postgresql+psycopg://app_user:x@127.0.0.1:1/none",
+            spelling(name): secret,
+        })
+    assert str(exc.value) == f"{name} must not be present in a runtime process"
+
+
 def test_enforce_posture_raises_on_any_violation(monkeypatch) -> None:
     runtime = build_database_runtime(
         {"DATABASE_URL": "postgresql+psycopg://app_user:x@127.0.0.1:1/none"}
