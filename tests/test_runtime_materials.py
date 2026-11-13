@@ -131,7 +131,7 @@ def test_valid_anonymous_key_passes() -> None:
 
 
 @pytest.mark.parametrize(
-    "value", [None, "dev-insecure-change-me", "short", "j" * 40, "c" * 40]
+    "value", [None, "dev-insecure-change-me", "short", "j" * 40, "s" * 40, "c" * 40]
 )
 def test_unsafe_anonymous_key_is_refused_without_disclosure(value: str | None) -> None:
     env = _anon_env()
@@ -145,3 +145,38 @@ def test_unsafe_anonymous_key_is_refused_without_disclosure(value: str | None) -
         assert all(value not in p for p in problems)
     with pytest.raises(RuntimeMaterialsError, match="ANONYMOUS_RATE_LIMIT_KEY_SECRET"):
         enforce_runtime_materials(env)
+
+
+def test_anonymous_key_rule_applies_when_store_unset() -> None:
+    env = _anon_env()
+    del env["ANONYMOUS_RATE_LIMIT_STORE"]
+    del env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"]
+    assert any(
+        "ANONYMOUS_RATE_LIMIT_KEY_SECRET" in p for p in runtime_materials_problems(env)
+    )
+
+
+def test_anonymous_key_rule_applies_to_padded_uppercase_store() -> None:
+    env = _anon_env(ANONYMOUS_RATE_LIMIT_STORE=" POSTGRES ")
+    del env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"]
+    assert any(
+        "ANONYMOUS_RATE_LIMIT_KEY_SECRET" in p for p in runtime_materials_problems(env)
+    )
+
+
+def test_whitespace_only_routes_leave_behaviour_unchanged() -> None:
+    env = _anon_env(ANONYMOUS_RATE_LIMIT_ROUTES="   ")
+    del env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"]
+    assert runtime_materials_problems(env) == []
+
+
+def test_anonymous_key_rule_applies_without_database_url() -> None:
+    env = {
+        "ANONYMOUS_RATE_LIMIT_ROUTES": "/login",
+        "ANONYMOUS_RATE_LIMIT_STORE": "postgres",
+    }
+    assert any(
+        "ANONYMOUS_RATE_LIMIT_KEY_SECRET" in p for p in runtime_materials_problems(env)
+    )
+    env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"] = "a" * 40
+    assert runtime_materials_problems(env) == []
