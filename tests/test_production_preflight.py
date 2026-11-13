@@ -62,6 +62,16 @@ def test_owner_materials_are_refused(production_env, monkeypatch, name):
     assert any(name in problem for problem in production_configuration_problems())
 
 
+@pytest.mark.parametrize("name", ["MIGRATION_DATABASE_URL", "LEGACY_DATABASE_URL"])
+@pytest.mark.parametrize("spelling", [str.lower, str.title])
+def test_owner_materials_are_refused_in_any_case(production_env, monkeypatch, name, spelling):
+    secret = "private-owner-material"
+    monkeypatch.setenv(spelling(name), secret)
+    problems = production_configuration_problems()
+    assert f"{name} must not be present in a runtime process" in problems
+    assert not any(secret in problem for problem in problems)
+
+
 def test_malformed_binding_is_sanitized(production_env, monkeypatch, capsys):
     secret = "private-url-that-must-not-be-printed"
     monkeypatch.setenv("DATABASE_URL", secret)
