@@ -236,7 +236,7 @@ def test_only_lowercase_spellings_with_strong_distinct_values_pass() -> None:
 def test_non_ascii_fold_lookalike_does_not_satisfy_gate_key() -> None:
     env = _valid_env()
     del env["JWT_SECRET"]
-    env["JWT_ſECRET"] = "j" * 40
+    env["JWT_\u017fECRET"] = "j" * 40
     assert runtime_materials_problems(env) == [
         "JWT_SECRET must be supplied when a database is bound"
     ]
@@ -245,9 +245,9 @@ def test_non_ascii_fold_lookalike_does_not_satisfy_gate_key() -> None:
 def test_kelvin_sign_name_is_treated_as_the_gate_key_like_the_kernel() -> None:
     env = _anon_env()
     del env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"]
-    good = {**env, "ANONYMOUS_RATE_LIMIT_KEY_SECRET": "a" * 40}
+    good = {**env, "ANONYMOUS_RATE_LIMIT_\u212aEY_SECRET": "a" * 40}
     assert runtime_materials_problems(good) == []
-    weak = {**env, "ANONYMOUS_RATE_LIMIT_KEY_SECRET": "short"}
+    weak = {**env, "ANONYMOUS_RATE_LIMIT_\u212aEY_SECRET": "short"}
     assert runtime_materials_problems(weak) == [
         "ANONYMOUS_RATE_LIMIT_KEY_SECRET must contain at least 32 bytes"
     ]
