@@ -21,8 +21,11 @@ def production_configuration_problems() -> list[str]:
     for name in ("DATABASE_URL", "PLATFORM_DATABASE_URL", "PLATFORM_ROOT_DOMAIN"):
         if not os.environ.get(name, "").strip():
             problems.append(f"{name} must be explicitly supplied")
+    # Refuse any letter case: the kernel's settings match names with
+    # str.lower() (as materials.py does), so a variant spelling must not slip by.
+    present = {key.lower() for key in os.environ}
     for name in ("MIGRATION_DATABASE_URL", "LEGACY_DATABASE_URL"):
-        if name in os.environ:
+        if name.lower() in present:
             problems.append(f"{name} must not be present in a runtime process")
 
     # config creates a module-level Settings too: keep the import inside this
