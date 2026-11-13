@@ -180,3 +180,74 @@ def test_anonymous_key_rule_applies_without_database_url() -> None:
     )
     env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"] = "a" * 40
     assert runtime_materials_problems(env) == []
+
+
+def test_lowercase_anonymous_routes_with_missing_key_is_refused() -> None:
+    env = _valid_env()
+    env["anonymous_rate_limit_routes"] = "/login"
+    assert any(
+        "ANONYMOUS_RATE_LIMIT_KEY_SECRET" in p for p in runtime_materials_problems(env)
+    )
+
+
+@pytest.mark.parametrize("value", ["short", "dev-insecure-change-me"])
+def test_lowercase_signing_secret_is_refused_like_uppercase(value: str) -> None:
+    env = _valid_env()
+    del env["JWT_SECRET"]
+    env["jwt_secret"] = value
+    problems = runtime_materials_problems(env)
+    assert any("JWT_SECRET" in p for p in problems)
+    assert all(value not in p for p in problems)
+
+
+def test_case_collision_is_refused_without_disclosure() -> None:
+    env = _valid_env()
+    other = "q" * 40
+    env["jwt_secret"] = other
+    problems = runtime_materials_problems(env)
+    assert any("JWT_SECRET" in p for p in problems)
+    joined = "; ".join(problems)
+    assert other not in joined
+    assert env["JWT_SECRET"] not in joined
+
+
+def test_lowercase_weak_signing_secret_reports_exact_weak_message() -> None:
+    env = _valid_env()
+    del env["JWT_SECRET"]
+    env["jwt_secret"] = "short"
+    assert runtime_materials_problems(env) == [
+        "JWT_SECRET must contain at least 32 bytes"
+    ]
+
+
+def test_case_collision_message_is_exact() -> None:
+    env = _valid_env()
+    env["jwt_secret"] = "q" * 40
+    assert runtime_materials_problems(env) == [
+        "JWT_SECRET is set under more than one letter case; supply exactly one spelling"
+    ]
+
+
+def test_only_lowercase_spellings_with_strong_distinct_values_pass() -> None:
+    env = {key.lower(): value for key, value in _anon_env().items()}
+    assert runtime_materials_problems(env) == []
+
+
+def test_non_ascii_fold_lookalike_does_not_satisfy_gate_key() -> None:
+    env = _valid_env()
+    del env["JWT_SECRET"]
+    env["JWT_\u017fECRET"] = "j" * 40
+    assert runtime_materials_problems(env) == [
+        "JWT_SECRET must be supplied when a database is bound"
+    ]
+
+
+def test_kelvin_sign_name_is_treated_as_the_gate_key_like_the_kernel() -> None:
+    env = _anon_env()
+    del env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"]
+    good = {**env, "ANONYMOUS_RATE_LIMIT_\u212aEY_SECRET": "a" * 40}
+    assert runtime_materials_problems(good) == []
+    weak = {**env, "ANONYMOUS_RATE_LIMIT_\u212aEY_SECRET": "short"}
+    assert runtime_materials_problems(weak) == [
+        "ANONYMOUS_RATE_LIMIT_KEY_SECRET must contain at least 32 bytes"
+    ]
