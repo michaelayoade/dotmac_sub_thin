@@ -180,3 +180,32 @@ def test_anonymous_key_rule_applies_without_database_url() -> None:
     )
     env["ANONYMOUS_RATE_LIMIT_KEY_SECRET"] = "a" * 40
     assert runtime_materials_problems(env) == []
+
+
+def test_lowercase_anonymous_routes_with_missing_key_is_refused() -> None:
+    env = _valid_env()
+    env["anonymous_rate_limit_routes"] = "/login"
+    assert any(
+        "ANONYMOUS_RATE_LIMIT_KEY_SECRET" in p for p in runtime_materials_problems(env)
+    )
+
+
+@pytest.mark.parametrize("value", ["short", "dev-insecure-change-me"])
+def test_lowercase_signing_secret_is_refused_like_uppercase(value: str) -> None:
+    env = _valid_env()
+    del env["JWT_SECRET"]
+    env["jwt_secret"] = value
+    problems = runtime_materials_problems(env)
+    assert any("JWT_SECRET" in p for p in problems)
+    assert all(value not in p for p in problems)
+
+
+def test_case_collision_is_refused_without_disclosure() -> None:
+    env = _valid_env()
+    other = "q" * 40
+    env["jwt_secret"] = other
+    problems = runtime_materials_problems(env)
+    assert any("JWT_SECRET" in p for p in problems)
+    joined = "; ".join(problems)
+    assert other not in joined
+    assert env["JWT_SECRET"] not in joined
