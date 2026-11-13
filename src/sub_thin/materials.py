@@ -14,7 +14,7 @@ environment, once a database is bound:
   without a bound DATABASE_URL): present, non-sentinel, >= 32 bytes and
   distinct from the other secrets (the kernel checks it in production only);
 - every lookup uses a canonical-name view of the env (matched with
-  ``str.lower()`` like the kernel) (the kernel's settings are
+  ``str.lower()`` like the kernel, whose settings are
   case-insensitive); two spellings of one gate key are refused;
 - ``TRUSTED_HOSTS`` declared;
 - ``SEED_ON_STARTUP`` explicitly false (absent means the kernel default,
@@ -114,8 +114,9 @@ def runtime_materials_problems(
 
     raw = os.environ if environ is None else environ
     # The kernel's BaseSettings is case-insensitive, so a lower-case name
-    # configures it while an exact-name lookup sees nothing. Read through an
-    # upper-cased view; two spellings of one gate key are ambiguous: refuse.
+    # configures it while an exact-name lookup sees nothing. Read through a
+    # lower-case canonical-name view (see _gate_view); two spellings of one
+    # gate key are ambiguous: refuse.
     env, collisions = _gate_view(raw)
     if collisions:
         return [
