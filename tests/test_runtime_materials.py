@@ -20,6 +20,13 @@ _DSN = "postgresql+psycopg://app_user:x@127.0.0.1:5432/subthin"
 _SECRET = "x" * 40
 
 
+@pytest.fixture(autouse=True)
+def _no_dotenv_in_cwd(tmp_path, monkeypatch):
+    """Run from an empty directory so a stray ./.env cannot affect the gate."""
+
+    monkeypatch.chdir(tmp_path)
+
+
 def _valid_env() -> dict[str, str]:
     return {
         "DATABASE_URL": _DSN,
@@ -251,3 +258,41 @@ def test_kelvin_sign_name_is_treated_as_the_gate_key_like_the_kernel() -> None:
     assert runtime_materials_problems(weak) == [
         "ANONYMOUS_RATE_LIMIT_KEY_SECRET must contain at least 32 bytes"
     ]
+
+
+_DOTENV_MSG = (
+    ".env file present in the working directory; "
+    "runtime settings must come only from the process environment"
+)
+
+
+def test_dotenv_in_cwd_is_refused_without_disclosure(tmp_path):
+    (tmp_path / ".env").write_text("JWT_SECRET=sentinel-dotenv-content\n")
+    assert runtime_materials_problems(_valid_env()) == [_DOTENV_MSG]
+    with pytest.raises(RuntimeMaterialsError) as exc:
+        enforce_runtime_materials(_valid_env())
+    assert str(exc.value) == _DOTENV_MSG
+    assert "sentinel-dotenv-content" not in str(exc.value)
+
+
+def test_dotenv_is_refused_in_empty_shell_mode(tmp_path):
+    (tmp_path / ".env").write_text("")
+    assert runtime_materials_problems({}) == [_DOTENV_MSG]
+
+
+def test_dotenv_directory_is_refused(tmp_path):
+    (tmp_path / ".env").mkdir()
+    assert runtime_materials_problems(_valid_env()) == [_DOTENV_MSG]
+
+
+def test_dangling_dotenv_symlink_is_refused(tmp_path):
+    (tmp_path / ".env").symlink_to(tmp_path / "missing-target")
+    assert runtime_materials_problems(_valid_env()) == [_DOTENV_MSG]
+
+
+def test_cwd_parameter_overrides_process_cwd(tmp_path):
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / ".env").write_text("")
+    assert runtime_materials_problems(_valid_env(), cwd=other) == [_DOTENV_MSG]
+    assert runtime_materials_problems(_valid_env()) == []
