@@ -14,9 +14,6 @@ from collections.abc import Sequence
 
 import uvicorn
 
-from sub_thin.assembly import database_runtime
-from sub_thin.database import DatabaseBindingError, enforce_runtime_posture
-from sub_thin.main import app
 from sub_thin.materials import RuntimeMaterialsError, enforce_runtime_materials
 
 
@@ -33,8 +30,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     # outside production, which once let a superuser DSN serve traffic.
     try:
         enforce_runtime_materials()
+    except RuntimeMaterialsError as exc:
+        print(f"refusing to serve: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+    # The kernel builds its Settings at import and reads ./.env: import the
+    # application only after the materials gate, so a malformed value can
+    # never escape as a value-bearing traceback ahead of the refusal.
+    from sub_thin.assembly import database_runtime
+    from sub_thin.database import DatabaseBindingError, enforce_runtime_posture
+    from sub_thin.main import app
+
+    try:
         enforce_runtime_posture(database_runtime)
-    except (DatabaseBindingError, RuntimeMaterialsError) as exc:
+    except DatabaseBindingError as exc:
         print(f"refusing to serve: {exc}", file=sys.stderr)
         raise SystemExit(2) from exc
     uvicorn.run(app, host="0.0.0.0", port=args.port)
