@@ -67,7 +67,9 @@ jobs:
 
       # Release record (deploy design WP4): what was published, the version and
       # the exact deploy-unit.toml bytes with their sha256. Exactly one image
-      # per version. Uploaded with the binding below; no publish, no secret.
+      # per version, and the exact product.toml bytes built from (the bound copy
+      # above, the bytes Foundation validates). Uploaded with the binding below;
+      # no publish, no secret.
       - name: Produce release record
         run: |
           version="$(python3 -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
@@ -76,6 +78,7 @@ jobs:
             --revision "${GITHUB_SHA}" \
             --version "${version}" \
             --descriptor deploy/deploy-unit.toml \
+            --product-toml binding/product.toml \
             --out binding/release-record
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
