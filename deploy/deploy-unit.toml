@@ -1,0 +1,134 @@
+# sub_thin deploy unit - schema dotmac.deploy_unit/1 (DRAFT, INERT).
+#
+# Sidecar to deploy/product.toml (design rev3 section 2.2). It holds NAMES,
+# types and bounds only: no value, no secret, no host address. Typed values and
+# secret references live in Control desired state, entered in the Control UI.
+#
+# sub_thin is a NEW build: runtime files only. There is deliberately no
+# legacy-env-file table (Control's legacy_never list refuses one at parse).
+# sub_thin is build-forward only; nothing here deploys, and nothing consumes
+# this file until Control a18 and the deploy agent exist. The D3 restore proof
+# still gates its first governed deploy.
+#
+# Binding by digest is the release record's job (product CI): it records the
+# digests of product.toml, this file and the params schema next to the image
+# digest. They are not stored here, because scripts/bind_image.py rewrites the
+# image binding in product.toml and a committed digest would never match.
+
+schema = "dotmac.deploy_unit/1"
+product = "dotmac-sub"
+spec = "deploy/product.toml"
+
+# Section 2.7 (D-1): every private image is transferred, never pulled. Written
+# out so the default is visible; an absent table means the same. "pull" is
+# accepted only for a repository on Control's public_pull_repositories
+# allowlist, which this file cannot widen.
+[image]
+source = "transfer"
+
+# ---------------------------------------------------------------- params
+# Non-secret typed values only. `material` ties a param to a Foundation
+# runtime-material name in product.toml.
+
+[params.platform_root_domain]
+type = "hostname"
+required_in = ["staging", "production"]
+material = "PLATFORM_ROOT_DOMAIN"
+max_length = 253
+
+[params.trusted_hosts]
+type = "string"
+required_in = ["staging", "production"]
+material = "TRUSTED_HOSTS"
+# Comma-separated host names, no spaces.
+pattern = "^[A-Za-z0-9.-]+(,[A-Za-z0-9.-]+)*$"
+max_length = 512
+
+[params.environment]
+type = "enum"
+choices = ["staging", "production"]
+required_in = ["staging", "production"]
+material = "ENVIRONMENT"
+
+# A serving process never seeds: fixed false.
+[params.seed_on_startup]
+type = "bool"
+default = false
+choices = [false]
+required_in = ["staging", "production"]
+material = "SEED_ON_STARTUP"
+
+# Image identity for the planned release (Control pins and cross-checks both).
+[params.image_repository]
+type = "image_repository"
+required_in = ["staging", "production"]
+
+[params.image_digest]
+type = "image_digest"
+required_in = ["staging", "production"]
+
+# -------------------------------------------------------------- bindings
+# The value of each binding is a secret_ref of the form
+# bao://<env>/<product>/kv/<role>/<binding>, held in Control, never here.
+[[bindings]]
+name = "DATABASE_URL"
+kind = "pg_login_dsn"
+roles = ["app"]
+writer = "ceremony"
+rotation = "copy_only"
+single_use = false
+
+[[bindings]]
+name = "PLATFORM_DATABASE_URL"
+kind = "pg_login_dsn"
+roles = ["app"]
+writer = "ceremony"
+rotation = "copy_only"
+single_use = false
+
+[[bindings]]
+name = "JWT_SECRET"
+kind = "key"
+roles = ["app"]
+writer = "generated"
+rotation = "copy_only"
+single_use = false
+
+[[bindings]]
+name = "SESSION_HASH_SECRET"
+kind = "key"
+roles = ["app"]
+writer = "generated"
+rotation = "copy_only"
+single_use = false
+
+[[bindings]]
+name = "CSRF_SECRET"
+kind = "key"
+roles = ["app"]
+writer = "generated"
+rotation = "copy_only"
+single_use = false
+
+# Owner and backup credentials: roles that never run in the serving container.
+[[bindings]]
+name = "MIGRATION_DATABASE_URL"
+kind = "pg_login_dsn"
+roles = ["migrate"]
+writer = "ceremony"
+rotation = "copy_only"
+single_use = true
+
+[[bindings]]
+name = "BACKUP_DATABASE_URL"
+kind = "pg_login_dsn"
+roles = ["backup"]
+writer = "ceremony"
+rotation = "copy_only"
+single_use = false
+
+# ---------------------------------------------------------------- health
+# Gate order the runner must pass, mapped onto Foundation probes and hooks. No
+# new gate engine. Ready must report database mode.
+[health]
+gates = ["migrate", "heads", "live", "ready"]
