@@ -1,4 +1,4 @@
-# Composed Sub shell — ProductDeploymentSpec.v1 (DRAFT, NOT DEPLOYABLE YET).
+# Composed Sub shell — ProductDeploymentSpec.v3 (DRAFT, NOT DEPLOYABLE YET).
 #
 # This is the N2 candidate descriptor for the designated host
 # 81.0.221.52 (vmi3698737). It is not consumed by any deployment path today.
@@ -7,7 +7,7 @@
 # backup dataset, D1/Gate 0). Regenerate rendered assets from this file;
 # never hand-edit a rendered result.
 
-schema = "ProductDeploymentSpec.v1"
+schema = "ProductDeploymentSpec.v3"
 product = "dotmac-sub"
 environment = "candidate"
 
@@ -137,3 +137,28 @@ deployment_annotations = false
 [rollout]
 stability_window_seconds = 60
 rollback_images_retained = 2
+
+# v3 compose topology (WP4 of the build-once generic deploy design). The shared
+# database server is attached to the internal "db" network by a separate
+# approved host step; this file does not create that attachment. Every service
+# the renderer emits needs a placement; migrate is profile-gated so a bare
+# compose up never runs DDL.
+[compose_topology]
+roles_depend_on_migrate = false
+
+[[compose_topology.networks]]
+code = "front"
+loopback_default = true
+
+[[compose_topology.networks]]
+code = "db"
+internal = true
+
+[[compose_topology.placements]]
+code = "app"
+networks = ["front", "db"]
+
+[[compose_topology.placements]]
+code = "migrate"
+networks = ["db"]
+profiles = ["ops"]
