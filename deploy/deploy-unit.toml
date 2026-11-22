@@ -18,6 +18,8 @@
 schema = "dotmac.deploy_unit/1"
 product = "dotmac-sub"
 spec = "deploy/product.toml"
+# The <product> segment of the approved OpenBao layout <env>/<product>.
+secrets_namespace = "sub"
 
 # Section 2.7 (D-1): every private image is transferred, never pulled. Written
 # out so the default is visible; an absent table means the same. "pull" is
