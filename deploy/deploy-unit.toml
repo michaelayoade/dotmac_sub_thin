@@ -5,7 +5,7 @@
 # secret references live in Control desired state, entered in the Control UI.
 #
 # sub_thin is a NEW build: runtime files only. There is deliberately no
-# legacy-env-file table (Control's legacy_never list refuses one at parse).
+# legacy-env-file table (Control is default-deny: only dotmac-erp-v2 may carry one).
 # sub_thin is build-forward only; nothing here deploys, and nothing consumes
 # this file until Control a18 and the deploy agent exist. The D3 restore proof
 # still gates its first governed deploy.

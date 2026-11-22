@@ -40,11 +40,25 @@ PARAM_TYPES = frozenset(
     }
 )
 WRITERS = frozenset({"generated", "operator", "ceremony", "integration"})
-ROTATIONS = frozenset({"copy_only", "rotatable", "external_coordinated", "never"})
+ROTATIONS = frozenset({"copy_only", "manual"})
+HEALTH_GATES = frozenset(
+    {
+        "migrate",
+        "grant_mirror",
+        "heads",
+        "live",
+        "ready",
+        "composition_equals_pins",
+        "runtime_policy_digest",
+        "census_zero_enabled",
+    }
+)
 BINDING_STATES = frozenset({"pre_staged", "active"})
 MATERIAL_NAME = re.compile(r"^[A-Z][A-Z0-9_]{0,127}$")
-# Products on Control's legacy_never list: refused at parse (section 2.2).
-LEGACY_NEVER_PRODUCTS = frozenset({"dotmac-sub", "dotmac-integrator-companion"})
+# Control is default-deny: legacy_env_file_allowed_products defaults to ERP v2
+# only, and a descriptor under deploy/companion/ is always refused.
+LEGACY_ALLOWED_DEFAULT = frozenset({"dotmac-erp-v2"})
+REFUSED_BY_DEFAULT = frozenset({"dotmac-sub", "dotmac-integrator-companion"})
 SECRET_NAME_HINT = re.compile(r"(SECRET|TOKEN|PASSWORD|KEY|DATABASE_URL|_DSN)$")
 # Values a params file could never carry: secret-shaped content and estate addresses.
 SECRET_SHAPED = re.compile(
@@ -160,8 +174,8 @@ def check_unit(
 
     legacy = unit.get("legacy_env_file")
     if legacy is not None:
-        if product in LEGACY_NEVER_PRODUCTS or companion_path:
-            problems.append("legacy-never")
+        if product not in LEGACY_ALLOWED_DEFAULT or companion_path:
+            problems.append("legacy-refused")
         names = legacy.get("names", [])
         if not names or len(set(names)) != len(names):
             problems.append("legacy-names")
@@ -202,6 +216,38 @@ def check_unit(
         ):
             problems.append(f"hold-point-unbounded:{hold.get('name')}")
 
+    for name, param in params.items():
+        if ("min" in param or "max" in param) and param.get("type") not in {
+            "int",
+            "duration_seconds",
+        }:
+            problems.append(f"param-bounds-type:{name}")
+    for job in unit.get("jobs", []):
+        if job.get("trigger") != "operator":
+            problems.append(f"job-trigger:{job.get('name')}")
+        known = {p["material"] for p in params.values() if "material" in p}
+        for material in job.get("materials", []):
+            if material not in known | binding_names:
+                problems.append(f"job-material-unknown:{material}")
+        runbook = job.get("runbook", "")
+        if runbook.startswith("/") or ".." in runbook.split("/"):
+            problems.append(f"job-runbook-path:{job.get('name')}")
+    for hold in unit.get("hold_points", []):
+        if hold.get("member") not in {"primary", "companion"}:
+            problems.append("hold-member")
+        if hold.get("before") not in {"migrate", "start", "switch"}:
+            problems.append("hold-before")
+        if hold.get("on_timeout") != "abandon_member_record_deviation":
+            problems.append("hold-on-timeout")
+        if hold.get("released_by") != "operator":
+            problems.append("hold-released-by")
+    health = unit.get("health")
+    if health is not None:
+        gates = health.get("gates", [])
+        if set(health) != {"gates"} or len(set(gates)) != len(gates):
+            problems.append("health-shape")
+        if not set(gates) <= HEALTH_GATES:
+            problems.append("health-gate-unknown")
     for text in _walk_strings(unit):
         if SECRET_SHAPED.search(text):
             problems.append("secret-shaped-string")
@@ -262,20 +308,20 @@ def test_image_source_default_transfer() -> None:
 def test_legacy_never_products() -> None:
     # sub_thin is a new build: runtime files only, no legacy bridge, no exceptions.
     unit = _unit()
-    assert unit["product"] in LEGACY_NEVER_PRODUCTS
+    assert unit["product"] in REFUSED_BY_DEFAULT
     assert "legacy_env_file" not in unit
     refused = copy.deepcopy(unit)
     refused["legacy_env_file"] = {
         "names": ["JWT_SECRET"],
         "path_param": "legacy_env_path",
     }
-    assert "legacy-never" in _check(refused)
+    assert "legacy-refused" in _check(refused)
     # A bridge is refused for any product on the list and for any companion path.
-    for product in sorted(LEGACY_NEVER_PRODUCTS):
+    for product in sorted(REFUSED_BY_DEFAULT):
         other = copy.deepcopy(refused)
         other["product"] = product
-        assert "legacy-never" in _check(other)
-    assert "legacy-never" in check_unit(refused, _spec(), companion_path=True)
+        assert "legacy-refused" in _check(other)
+    assert "legacy-refused" in check_unit(refused, _spec(), companion_path=True)
 
 
 def test_no_legacy_env_file_text_or_material_anywhere() -> None:
